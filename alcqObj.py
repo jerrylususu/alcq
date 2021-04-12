@@ -8,6 +8,7 @@
 
 from typing import Union, Set, List
 
+
 class DCConstant(object):
     def __init__(self, name: str):
         self.name = name
@@ -20,6 +21,7 @@ class DCConstant(object):
 
     def __hash__(self):
         return hash(self.__repr__())
+
 
 class DCTop(DCConstant):
     def __init__(self):
@@ -45,7 +47,8 @@ class Constant(object):
     """
     Individual
     """
-    def __init__(self, name:str):
+
+    def __init__(self, name: str):
         self.name = name
 
     def __repr__(self):
@@ -76,7 +79,7 @@ class Formula(object):
     def __init__(self):
         pass
 
-    def __call__(self, obj:Constant, *args, **kwargs):
+    def __call__(self, obj: Constant, *args, **kwargs):
         return ComplexAssertion(self, obj)
 
     def __hash__(self):
@@ -104,7 +107,7 @@ class Relation(object):
     def __repr__(self):
         return f"R({self.name!r})"
 
-    def __call__(self, obj1: Constant, obj2: Constant,*args, **kwargs):
+    def __call__(self, obj1: Constant, obj2: Constant, *args, **kwargs):
         return RelationAssertion(self, obj1, obj2)
 
     def __eq__(self, other):
@@ -131,9 +134,6 @@ class Operator(Formula):
 #         return f"{self.content!r}"
 
 
-
-
-
 class DefinedConcept(Concept, Formula):
     def __init__(self, name: str, defn: Formula):
         Concept.__init__(self, name)
@@ -150,7 +150,7 @@ class DefinedConcept(Concept, Formula):
 
 
 class And(Operator):
-    def __init__(self, param1:Formula, param2:Formula):
+    def __init__(self, param1: Formula, param2: Formula):
         Operator.__init__(self, "And")
         self.param1 = param1
         self.param2 = param2
@@ -159,14 +159,15 @@ class And(Operator):
         return f"And({self.param1!r}, {self.param2!r})"
 
     def __eq__(self, other):
-        return isinstance(other, And) and ( (self.param1 == other.param1 and self.param2 == other.param2)  or (self.param1 == other.param2 and self.param2== other.param1) )
+        return isinstance(other, And) and ((self.param1 == other.param1 and self.param2 == other.param2) or (
+                    self.param1 == other.param2 and self.param2 == other.param1))
 
     def __hash__(self):
         return Operator.__hash__(self)
 
 
 class Or(Operator):
-    def __init__(self, param1:Formula, param2:Formula):
+    def __init__(self, param1: Formula, param2: Formula):
         Operator.__init__(self, "Or")
         self.param1 = param1
         self.param2 = param2
@@ -175,14 +176,15 @@ class Or(Operator):
         return f"Or({self.param1!r}, {self.param2!r})"
 
     def __eq__(self, other):
-        return isinstance(other, Or) and ( (self.param1 == other.param1 and self.param2 == other.param2)  or (self.param1 == other.param2 and self.param2== other.param1) )
+        return isinstance(other, Or) and ((self.param1 == other.param1 and self.param2 == other.param2) or (
+                    self.param1 == other.param2 and self.param2 == other.param1))
 
     def __hash__(self):
         return Operator.__hash__(self)
 
 
 class Not(Operator):
-    def __init__(self, param:Formula):
+    def __init__(self, param: Formula):
         Operator.__init__(self, "Not")
         self.param = param
 
@@ -194,6 +196,7 @@ class Not(Operator):
 
     def __hash__(self):
         return Operator.__hash__(self)
+
 
 class ForAll(Operator):
     def __init__(self, relation: Relation, concept: Union[DCConstant, Concept, Formula]):
@@ -209,6 +212,7 @@ class ForAll(Operator):
 
     def __hash__(self):
         return Operator.__hash__(self)
+
 
 class Exists(Operator):
     def __init__(self, relation: Relation, concept: Union[DCConstant, Concept, Formula]):
@@ -249,6 +253,7 @@ class ConceptAssertion(Assertion):
     def __hash__(self):
         return Assertion.__hash__(self)
 
+
 class RelationAssertion(Assertion):
     def __init__(self, relation: Relation, obj1: Constant, obj2: Constant):
         Assertion.__init__(self)
@@ -260,10 +265,12 @@ class RelationAssertion(Assertion):
         return f"RA[{self.relation!r}:({self.obj1!r},{self.obj2!r})]"
 
     def __eq__(self, other):
-        return isinstance(other, RelationAssertion) and self.relation == other.relation and self.obj1 == other.obj1 and self.obj2 == other.obj2
+        return isinstance(other,
+                          RelationAssertion) and self.relation == other.relation and self.obj1 == other.obj1 and self.obj2 == other.obj2
 
     def __hash__(self):
         return Assertion.__hash__(self)
+
 
 # TODO: make this a set?
 ABox = Set[Assertion]
@@ -284,4 +291,3 @@ class ComplexAssertion(Assertion):
 
     def __hash__(self):
         return Assertion.__hash__(self)
-

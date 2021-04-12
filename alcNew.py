@@ -12,7 +12,6 @@ def expand_formula(f: Formula) -> Formula:
 
     # print(type(f), f)
 
-
     if isinstance(f, And):
         return And(expand_formula(f.param1), expand_formula(f.param2))
     elif isinstance(f, Or):
@@ -20,7 +19,8 @@ def expand_formula(f: Formula) -> Formula:
     elif isinstance(f, Not):
         return Not(expand_formula(f.param))
     elif isinstance(f, ForAll):
-        if isinstance(f.concept, PrimitiveConcept) or isinstance(f.concept, DCConstant) or isinstance(f.concept, Relation):
+        if isinstance(f.concept, PrimitiveConcept) or isinstance(f.concept, DCConstant) or isinstance(f.concept,
+                                                                                                      Relation):
             return ForAll(f.relation, f.concept)
         elif isinstance(f.concept, DefinedConcept):
             dc: DefinedConcept = f.concept
@@ -28,14 +28,14 @@ def expand_formula(f: Formula) -> Formula:
         else:
             return ForAll(f.concept, expand_formula(f.concept))
     elif isinstance(f, Exists):
-        if isinstance(f.concept, PrimitiveConcept) or isinstance(f.concept, DCConstant) or isinstance(f.concept, Relation):
+        if isinstance(f.concept, PrimitiveConcept) or isinstance(f.concept, DCConstant) or isinstance(f.concept,
+                                                                                                      Relation):
             return Exists(f.relation, f.concept)
         elif isinstance(f.concept, DefinedConcept):
             dc: DefinedConcept = f.concept
             return Exists(f.relation, expand_formula(dc.definition))
         else:
             return Exists(f.relation, expand_formula(f.concept))
-
 
     print(type(f), f)
     raise RuntimeError("should not be here")
@@ -53,13 +53,13 @@ def expand_concept(c: Concept) -> Formula:
         return c
 
     if isinstance(c, DefinedConcept):
-        defn :Formula = c.definition
+        defn: Formula = c.definition
 
         # pre_process
         # if isinstance(defn, ForAll) or isinstance(defn, Exists):
         #     if isinstance(defn.concept, DCConstant):
 
-        expanded :Formula = expand_formula(defn)
+        expanded: Formula = expand_formula(defn)
         return expanded
 
     print(type(c))
@@ -112,7 +112,7 @@ def process_abox(abox: ABox) -> ABox:
     :param abox:
     :return:
     """
-    new_abox : ABox = set()
+    new_abox: ABox = set()
     for a in abox:
         new_a: Optional[Assertion] = None
         if isinstance(a, ConceptAssertion):
@@ -133,6 +133,7 @@ def process_abox(abox: ABox) -> ABox:
 
     return new_abox
 
+
 # concept, formula
 def get_cf_search_type(c: Union[Concept, Formula]):
     if isinstance(c, PrimitiveConcept):
@@ -142,7 +143,8 @@ def get_cf_search_type(c: Union[Concept, Formula]):
     elif isinstance(c, Formula):
         return ComplexAssertion
 
-def build_cf_query(c: Union[Concept, Formula], a:Constant):
+
+def build_cf_query(c: Union[Concept, Formula], a: Constant):
     if isinstance(c, PrimitiveConcept):
         return ConceptAssertion(c, a)
     elif isinstance(c, DefinedConcept):
@@ -166,7 +168,6 @@ def and_both_exist(abox: ABox, c: Union[Concept, Formula], d: Union[Concept, For
     return c_a_exist and d_a_exist
 
 
-
 # check and apply?
 def and_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
     # deep copy?
@@ -175,9 +176,9 @@ def and_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
     found_assertion: Optional[ComplexAssertion] = None
     found_formula: Optional[And] = None
 
-    for idx,a in enumerate(abox):
+    for idx, a in enumerate(abox):
         if isinstance(a, ComplexAssertion):
-            f :Formula = a.formula
+            f: Formula = a.formula
             if isinstance(f, And):
                 # found And(C,D) (a)
                 # need to check if C(a) and D(a) are already here
@@ -193,8 +194,8 @@ def and_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
         # and don't change number
         new_abox = set(abox)
         # new_abox.remove(found_assertion)
-        new_abox.add(ComplexAssertion(found_formula.param1,found_assertion.obj))
-        new_abox.add(ComplexAssertion(found_formula.param2,found_assertion.obj))
+        new_abox.add(ComplexAssertion(found_formula.param1, found_assertion.obj))
+        new_abox.add(ComplexAssertion(found_formula.param2, found_assertion.obj))
         return True, [new_abox]
     else:
         return False, []
@@ -211,7 +212,7 @@ def exist_already_exist(abox: ABox, r: Relation, c: Concept, a: Constant) -> boo
                 possible_2nd_set.add(assertion.obj2)
 
     # then check C(c)
-    possible_query = {build_cf_query(c,p) for p in possible_2nd_set}
+    possible_query = {build_cf_query(c, p) for p in possible_2nd_set}
     for assertion in abox:
         if assertion in possible_query:
             return True
@@ -246,7 +247,6 @@ def exist_rule(abox: ABox, cs: ConstantStorage) -> Tuple[bool, List[ABox]]:
             # we need to check r(a,c), C(c)
             # check rest:
             if not exist_already_exist(abox, r, c, a.obj):
-
                 found_use_case = True
                 found_idx = idx
                 found_assertion = a
@@ -286,7 +286,7 @@ def union_neither_exists(abox: ABox, C: Union[Concept, Formula], D: Union[Concep
     return not c_a_exist and not d_a_exist
 
 
-def union_rule(abox: ABox) -> Tuple[bool,List[ABox]]:
+def union_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
     found_use_case = False
     found_idx = -1
     found_assertion: Optional[ComplexAssertion] = None
@@ -340,7 +340,7 @@ def forall_apply_list(abox: ABox, r: Relation, C: Union[Concept, Formula], a: Co
         found_b = False
         for assertion in abox:
             if assertion == b_query:
-                found_b =True
+                found_b = True
                 break
 
         if not found_b:
@@ -366,7 +366,7 @@ def forall_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
             # now we have Or(C,D) (a)
             # we need to check either C(a) or D(a)
             # check rest:
-            need_apply, apply_list = forall_apply_list(abox,r,c,a.obj)
+            need_apply, apply_list = forall_apply_list(abox, r, c, a.obj)
             if need_apply:
                 found_use_case = True
                 found_idx = idx
@@ -421,7 +421,7 @@ def is_abox_open(abox: ABox) -> bool:
 def run_tableau_algo(abox: ABox):
     # hash?
     # duplicate abox?
-    worlds : List[ABox] = [abox]
+    worlds: List[ABox] = [abox]
 
     found_one_apply = False
 
@@ -436,12 +436,11 @@ def run_tableau_algo(abox: ABox):
 
         # rules = [and_rule, forall_rule ,partial(exist_rule, cs=cs)]
 
-
         for rule in rules:
             for idx, w in enumerate(worlds):
                 found, new_list = rule(w)
                 if found:
-                    print("apply on world ", idx )
+                    print("apply on world ", idx)
                     print("found!", idx, w)
                     print("rule!", rule)
                     found_one_apply = True
@@ -460,7 +459,7 @@ def run_tableau_algo(abox: ABox):
         print("------------------")
         print("Current Worlds: ", len(worlds))
         for idx, w in enumerate(worlds):
-            print(idx, "len", len(w) ,w)
+            print(idx, "len", len(w), w)
             for idx2, l in enumerate(w):
                 print("world", idx, "line", idx2, l)
         print("------------------")
@@ -493,8 +492,6 @@ def run_tableau_algo(abox: ABox):
     print("final verdict: ", any(world_open_list))
 
 
-
-
 if __name__ == '__main__':
     Smart = PrimitiveConcept("Smart")
     Studious = PrimitiveConcept("Studious")
@@ -510,13 +507,11 @@ if __name__ == '__main__':
 
     # tbox = [Smart, Studious, GoodStudent, StraightA, MultiOffer, NBStudnet, NiuWa]
 
-
     a = Constant("a")
     s1 = Constant("Student 1")
     c1 = Constant("Course 1")
     print(GoodStudent(a))
     print(attendBy(c1, s1))
-
 
     topic = Relation("topic")
 
@@ -546,7 +541,6 @@ if __name__ == '__main__':
     processed_abox = process_abox(abox)
     run_tableau_algo(processed_abox)
 
-
     A = PrimitiveConcept("A")
     B = PrimitiveConcept("B")
     C = PrimitiveConcept("C")
@@ -556,7 +550,7 @@ if __name__ == '__main__':
     p1 = ForAll(r, ForAll(s, A))
     p2 = Exists(r, ForAll(s, B))
     p3 = ForAll(r, Exists(s, C))
-    p4 = Exists(r, Exists(s, And(A,And(B,C))))
+    p4 = Exists(r, Exists(s, And(A, And(B, C))))
 
     w2 = And(p1, And(p2, And(p3, Not(p4))))
 
@@ -568,10 +562,9 @@ if __name__ == '__main__':
 
     # TOD0: test top/bottom
 
-
     p1 = ForAll(r, ForAll(s, A))
     p2 = Or(Exists(r, ForAll(s, Not(A))), ForAll(r, Exists(s, B)))
-    p3 = Or(ForAll(r, Exists(s, And(A,B))), Exists(r, ForAll(s, Not(B))))
+    p3 = Or(ForAll(r, Exists(s, And(A, B))), Exists(r, ForAll(s, Not(B))))
 
     w3 = And(p1, And(p2, Not(p3)))
 
@@ -579,4 +572,3 @@ if __name__ == '__main__':
     abox = {w3(a)}
     # pb = process_abox(abox)
     # run_tableau_algo(pb)
-
