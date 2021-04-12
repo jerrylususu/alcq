@@ -9,7 +9,8 @@
 from typing import Union, Set, List
 
 
-class DCConstant(object):
+# Description Logic Constant
+class DLConstant(object):
     def __init__(self, name: str):
         self.name = name
 
@@ -17,30 +18,31 @@ class DCConstant(object):
         return f"DConstant({self.name!r})"
 
     def __eq__(self, other):
-        return isinstance(other, DCConstant) and self.name == other.name
+        return isinstance(other, DLConstant) and self.name == other.name
 
     def __hash__(self):
         return hash(self.__repr__())
 
 
-class DCTop(DCConstant):
+class DLTop(DLConstant):
     def __init__(self):
-        DCConstant.__init__(self, "Top")
+        DLConstant.__init__(self, "Top")
 
     def __repr__(self):
         return "⊤"
 
 
-class DCBottom(DCConstant):
+class DLBottom(DLConstant):
     def __init__(self):
-        DCConstant.__init__(self, "Bottom")
+        DLConstant.__init__(self, "Bottom")
 
     def __repr__(self):
         return "⊥"
 
 
-Top = DCTop()
-Bottom = DCBottom()
+# Top = DLTop()
+# Bottom = DLBottom()
+
 
 
 class Constant(object):
@@ -160,7 +162,7 @@ class And(Operator):
 
     def __eq__(self, other):
         return isinstance(other, And) and ((self.param1 == other.param1 and self.param2 == other.param2) or (
-                    self.param1 == other.param2 and self.param2 == other.param1))
+                self.param1 == other.param2 and self.param2 == other.param1))
 
     def __hash__(self):
         return Operator.__hash__(self)
@@ -177,7 +179,7 @@ class Or(Operator):
 
     def __eq__(self, other):
         return isinstance(other, Or) and ((self.param1 == other.param1 and self.param2 == other.param2) or (
-                    self.param1 == other.param2 and self.param2 == other.param1))
+                self.param1 == other.param2 and self.param2 == other.param1))
 
     def __hash__(self):
         return Operator.__hash__(self)
@@ -199,7 +201,7 @@ class Not(Operator):
 
 
 class ForAll(Operator):
-    def __init__(self, relation: Relation, concept: Union[DCConstant, Concept, Formula]):
+    def __init__(self, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
         Operator.__init__(self, "ForAll")
         self.relation = relation
         self.concept = concept
@@ -215,7 +217,7 @@ class ForAll(Operator):
 
 
 class Exists(Operator):
-    def __init__(self, relation: Relation, concept: Union[DCConstant, Concept, Formula]):
+    def __init__(self, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
         Operator.__init__(self, "Exists")
         self.relation = relation
         self.concept = concept
@@ -228,6 +230,47 @@ class Exists(Operator):
 
     def __hash__(self):
         return Operator.__hash__(self)
+
+
+class AtLeast(Operator):
+    def __init__(self, n: int, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
+        Operator.__init__(self, "AtLeast")
+        if n < 0:
+            raise ValueError("invalid n")
+
+        self.n = n
+        self.relation = relation
+        self.concept = concept
+
+    def __repr__(self):
+        return f"AtLeast[{self.n!r}]({self.relation!r}, {self.concept!r})"
+
+    def __eq__(self, other):
+        return isinstance(other,
+                          AtLeast) and self.n == other.n and self.relation == other.relation and self.concept == other.concept
+
+    def __hash__(self):
+        return hash(self.__repr__())
+
+class AtMost(Operator):
+    def __init__(self, n: int, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
+        Operator.__init__(self, "AtMost")
+        if n < 0:
+            raise ValueError("invalid n")
+
+        self.n = n
+        self.relation = relation
+        self.concept = concept
+
+    def __repr__(self):
+        return f"AtMost[{self.n!r}]({self.relation!r}, {self.concept!r})"
+
+    def __eq__(self, other):
+        return isinstance(other,
+                          AtMost) and self.n == other.n and self.relation == other.relation and self.concept == other.concept
+
+    def __hash__(self):
+        return hash(self.__repr__())
 
 
 class Assertion(object):
@@ -291,3 +334,38 @@ class ComplexAssertion(Assertion):
 
     def __hash__(self):
         return Assertion.__hash__(self)
+
+
+class InequalityAssertion(Assertion):
+    def __init__(self, obj1: Constant, obj2: Constant):
+        super().__init__()
+        self.obj1 = obj1
+        self.obj2 = obj2
+
+    def __repr__(self):
+        return f"NEQ[{self.obj1!r}, {self.obj2!r}]"
+
+    def __eq__(self, other):
+        return isinstance(other, InequalityAssertion) and ((self.obj1 == other.obj1 and self.obj2 == other.obj2)
+                                                           or (self.obj1 == other.obj2 and self.obj2 == other.obj1))
+
+    # TODO: x1=x2, x2=x1? AND/OR also has a similar problem?
+    __hash__ = Assertion.__hash__
+
+
+def ne(obj1: Constant, obj2: Constant) -> InequalityAssertion:
+    """
+    Simple method to build inequality assertion
+    :param obj1:
+    :param obj2:
+    :return:
+    """
+    if not isinstance(obj1, Constant) or not isinstance(obj2, Constant):
+        raise ValueError("Param not constant")
+    return InequalityAssertion(obj1, obj2)
+
+
+InternalA = PrimitiveConcept("$InternalA")
+Top = DefinedConcept("Top", Or(InternalA, Not(InternalA)))
+InternalB = PrimitiveConcept("$InternalB")
+Bottom = DefinedConcept("Bottom", And(InternalB, Not(InternalB)))
