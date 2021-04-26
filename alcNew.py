@@ -28,7 +28,7 @@ def expand_formula(f: Formula) -> Formula:
             dc: DefinedConcept = f.concept
             return ForAll(f.relation, expand_formula(dc.definition))
         else:
-            return ForAll(f.concept, expand_formula(f.concept))
+            return ForAll(f.relation, expand_formula(f.concept))
     elif isinstance(f, Exists):
         # TODO: Why relation here?
         if isinstance(f.concept, PrimitiveConcept) or isinstance(f.concept, DLConstant) or isinstance(f.concept,
@@ -152,7 +152,10 @@ def process_abox(abox: ABox) -> ABox:
         if isinstance(a, ConceptAssertion):
             c = a.concept
             processed_c = push_in_not(expand_concept(c))
-            new_a = ComplexAssertion(processed_c, a.obj)
+            if isinstance(processed_c, PrimitiveConcept):
+                new_a = ConceptAssertion(processed_c, a.obj)
+            else:
+                new_a = ComplexAssertion(processed_c, a.obj)
         elif isinstance(a, RelationAssertion):
             new_a = a
         elif isinstance(a, ComplexAssertion):
@@ -165,6 +168,7 @@ def process_abox(abox: ABox) -> ABox:
         if new_a is not None:
             new_abox.add(new_a)
         else:
+            print(type(a), a)
             raise RuntimeError("should not happen")
 
     return new_abox
@@ -195,10 +199,15 @@ def build_cf_query(c: Union[Concept, Formula], a: Constant):
 
 
 def and_both_exist(abox: ABox, c: Union[Concept, Formula], d: Union[Concept, Formula], a: Constant) -> bool:
+
+    # note: here c&d has been splited, need to check in and_rule, before this invocation
+    # if is_this_concept_top(c):
+    #     return True
+
     c_a_exist, d_a_exist = False, False
     c_query, d_query = build_cf_query(c, a), build_cf_query(d, a)
-    print("debug1", c_query)
-    print("debug2", d_query)
+    # print("debug1", c_query)
+    # print("debug2", d_query)
 
     for assertion in abox:
         if assertion == c_query:
@@ -206,7 +215,7 @@ def and_both_exist(abox: ABox, c: Union[Concept, Formula], d: Union[Concept, For
         if assertion == d_query:
             d_a_exist = True
 
-    print("debug3", c_a_exist, d_a_exist)
+    # print("debug3", c_a_exist, d_a_exist)
 
     return c_a_exist and d_a_exist
 
@@ -223,14 +232,22 @@ def and_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
         if isinstance(a, ComplexAssertion):
             f: Formula = a.formula
             if isinstance(f, And):
+
+                if is_this_bottom_something(f):
+                    print("debug and_rule found bottom", f)
+                    # no need to apply and on top
+                    continue
+
                 # found And(C,D) (a)
                 # need to check if C(a) and D(a) are already here
                 # Abox should be a set...
+
                 if not and_both_exist(abox, f.param1, f.param2, a.obj):
                     found_use_case = True
                     found_idx = idx
                     found_assertion = a
                     found_formula = f
+                    print("debug and_rule found formula", found_formula)
                     break
 
     if found_use_case:
@@ -264,6 +281,13 @@ def exist_already_exist(abox: ABox, r: Relation, c: Concept, a: Constant) -> boo
                 possible_2nd_set.add(assertion.obj2)
 
     # then check C(c)
+
+    # special case: For top directly return
+    print("debug exist rule, C", c)
+    if is_this_top_something(c):
+        print("debug exist rule, found top")
+        return True
+
     possible_query = {build_cf_query(c, p) for p in possible_2nd_set}
     for assertion in abox:
         if assertion in possible_query:
@@ -328,6 +352,9 @@ def exist_rule(abox: ABox, cs: ConstantStorage) -> Tuple[bool, List[ABox]]:
 
 
 def union_neither_exists(abox: ABox, C: Union[Concept, Formula], D: Union[Concept, Formula], a: Constant) -> bool:
+    if is_this_top_something(C):
+        return not True and not True
+
     c_a_exist, d_a_exist = False, False
     c_query, d_query = build_cf_query(C, a), build_cf_query(D, a)
 
@@ -348,6 +375,12 @@ def union_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
 
     for idx, a in enumerate(abox):
         if isinstance(a, ComplexAssertion) and isinstance(a.formula, Or):
+
+            # don't decompose top
+            if is_this_top_something(a.formula):
+                print("debug union_rule top found: ", a.formula)
+                continue
+
             C: Formula = a.formula.param1
             D: Formula = a.formula.param2
             # now we have Or(C,D) (a)
@@ -382,13 +415,16 @@ def union_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
 
 
 def forall_apply_list(abox: ABox, r: Relation, C: Union[Concept, Formula], a: Constant) -> Tuple[bool, Set[Constant]]:
+
+    # if Top, can let it add, will be handled by post processing
+
     # first find all possible b
     possible_2nd_set = set()
     for assertion in abox:
-        if isinstance(assertion, RelationAssertion) and assertion.obj1 == a:
+        if isinstance(assertion, RelationAssertion) and assertion.relation == r and assertion.obj1 == a:
             possible_2nd_set.add(assertion.obj2)
 
-    print("debug2", possible_2nd_set)
+    # print("debug2", possible_2nd_set)
     # not C(b)
     should_be_added_set = set()
     for b in possible_2nd_set:
@@ -402,7 +438,7 @@ def forall_apply_list(abox: ABox, r: Relation, C: Union[Concept, Formula], a: Co
         if not found_b:
             should_be_added_set.add(b)
 
-    print("debug3", should_be_added_set)
+    # print("debug3", should_be_added_set)
 
     return len(should_be_added_set) != 0, should_be_added_set
 
@@ -416,7 +452,7 @@ def forall_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
 
     for idx, a in enumerate(abox):
         if isinstance(a, ComplexAssertion) and isinstance(a.formula, ForAll):
-            print("debug", a)
+            # print("debug", a)
             r: Relation = a.formula.relation
             c: Concept = a.formula.concept
             # now we have Or(C,D) (a)
@@ -481,15 +517,17 @@ def at_least_should_apply(abox: ABox, n: int, r: Relation, c: Union[Concept, For
     # find all possible c_is
     all_c_li = []
     for assertion in abox:
-        if isinstance(assertion, RelationAssertion) and assertion.obj1 == a:
-            all_c_li.append(a)
+        if isinstance(assertion, RelationAssertion) and assertion.relation == r and assertion.obj1 == a:
+            all_c_li.append(assertion.obj2)
 
     # do a filter by C
     new_all_c_li = []
     for current_ci in all_c_li:
         # if success then add
         # special case
-        if isinstance(c, DLTop):
+        # print(c)
+        if is_this_top_something(c):
+            # print("debug been here")
             # TODO: always success
             new_all_c_li.append(current_ci)
         elif isinstance(c, DLBottom):
@@ -503,9 +541,11 @@ def at_least_should_apply(abox: ABox, n: int, r: Relation, c: Union[Concept, For
     all_c_li = new_all_c_li
 
     all_c_li = list(set(all_c_li))
+    print("debug at least all_c_li", all_c_li)
 
     # early check
     if len(all_c_li) < n:
+        print("at least early stopping:", "len:", len(all_c_li), "li", all_c_li, "n:", n)
         return True
 
     # check with basic permutation?
@@ -513,21 +553,28 @@ def at_least_should_apply(abox: ABox, n: int, r: Relation, c: Union[Concept, For
         # now we have an tuple of size N
         current_comb_ok = True
 
-        for one_not_equal_pair in combinations(comb, 2):
-            if ne(comb[0], comb[1]) not in abox and ne(comb[1], comb[0]) not in abox:
+        # goal: check if in "any" combination, "all" the inequality pair exists in abox
+        # if such combination (a qualified one, all pair exists) is found, then no need to apply
+        # otherwise need to apply
+
+
+        for bi,bj in combinations(comb, 2):
+            if ne(bi, bj) not in abox and ne(bj, bi) not in abox:
+                # one inequality pair not exist
                 # current combination is not qualified
                 current_comb_ok = False
                 break
 
         if current_comb_ok:
-            # found one such combination, no need to apply
+            # found one such (qualified) combination, no need to apply
             return False
         else:
             # this combination failed, just keep finding
             pass
 
+    # all combination failed, need to apply
     # no more combination, just return false
-    return False
+    return True
 
 def at_least_rule(abox: ABox, cb: ConstantBuilder) -> Tuple[bool, List[ABox]]:
     found_use_case = False
@@ -608,7 +655,7 @@ def at_most_should_apply(abox: ABox, n: int, r: Relation, c: Union[Concept, Form
     new_possible_b_li = []
     for current_b in possible_b_li:
 
-        if isinstance(c, DLTop):
+        if is_this_top_something(c):
             new_possible_b_li.append(current_b)
         elif isinstance(c, DLBottom):
             pass
@@ -633,6 +680,7 @@ def at_most_should_apply(abox: ABox, n: int, r: Relation, c: Union[Concept, Form
     # as long as one equality don't exist, we can use
 
     for comb in combinations(possible_b_li, n+1):
+        print("debug at most checking comb", comb)
         for bi, bj in combinations(comb, 2):
             if InequalityAssertion(bi, bj) not in abox and InequalityAssertion(bj,bi) not in abox:
                 # we found one eq not in...
@@ -722,12 +770,28 @@ def at_most_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
 
         new_abox_li: List[ABox] = []
         # do some kind of substitution?
+        print("debug at most comb:", found_combination)
         for bi, bj in combinations(found_combination, 2):
+            print("debug at most current replacing", bi, bj)
+            bi: Constant
+            bj: Constant
             if ne(bi,bj) not in abox and ne(bj,bi) not in abox:
                 # FIXME: choose one direction to substitute?
                 abox_copy = set(abox)
+                print("at most abox before", abox_copy)
                 print("at most replacing", bi, bj)
-                new_abox = make_substitution(abox_copy, bi, bj)
+
+                # fix 4 child has at most 2 problem
+                bi_names = bi.name.split("~")
+                bj_names = bj.name.split("~")
+                bi_names += bj_names
+                print("debug bi_names:", bi_names)
+                all_names = sorted(bi_names)
+
+                new_constant = Constant("~".join(all_names))
+                new_abox = make_substitution(abox_copy, bi, new_constant)
+                new_abox = make_substitution(new_abox, bj, new_constant)
+                print("at most abox after", new_abox)
                 new_abox_li.append(new_abox)
 
         return True, new_abox_li
@@ -736,6 +800,13 @@ def at_most_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
 
 
 def choose_rule_can_apply(abox: ABox, r: Relation, c: Concept, a: Constant) -> Tuple[bool, Optional[Constant]]:
+    # don't apply if C is top
+    if is_this_top_something(c):
+        return False, None
+
+    print("debug choose rule: c", c)
+    print("debug choose rule equal:", c==Top)
+
     # check all possible b
     possible_b_list: List[Constant] = []
     for assertion in abox:
@@ -743,21 +814,35 @@ def choose_rule_can_apply(abox: ABox, r: Relation, c: Concept, a: Constant) -> T
             possible_b_list.append(assertion.obj2)
 
     # check all C(b)
-    # FIXME: add check for not c(b)
+    # DONE: add check for not c(b)
     for current_b in possible_b_list:
         b_query = build_cf_query(c, current_b)
+
+        # inside it's all XA
+        # if isinstance(b_query, ConceptAssertion):
+        #     b_query = ComplexAssertion(b_query.concept, current_b)
+
         not_b_query: Assertion = None
         if isinstance(b_query, ConceptAssertion) and isinstance(b_query.concept, PrimitiveConcept):
             not_b_query = ComplexAssertion(Not(b_query.concept), current_b)
         elif isinstance(b_query, ComplexAssertion):
-            not_b_query = ComplexAssertion(push_in_not(Not(b_query.formula)), current_b)
+            inside = push_in_not(Not(b_query.formula))
+            if isinstance(inside, Concept):
+                not_b_query = ConceptAssertion(inside, current_b)
+            else:
+                not_b_query = ComplexAssertion(push_in_not(Not(b_query.formula)), current_b)
             # TODO: c itself is a not?
         else:
             # print(b_query, type(b_query))
             raise RuntimeError("should not be here")
 
-        if b_query in abox:
-            # found one C(b)
+        if not_b_query is None:
+            raise RuntimeError("should not happen")
+
+        if b_query not in abox and not_b_query not in abox:
+            # neither C(b) nor NOT(C(b)) exists
+            print("choose rule debug", "b_query", b_query, "not_b_query" , not_b_query)
+            print("choose rule: chosen", current_b, "with C:",c)
             return True, current_b
 
     return False, None
@@ -801,12 +886,6 @@ def choose_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
             raise RuntimeError("should not happen")
         elif isinstance(found_at_most.concept, Formula):
             new_assertion = ComplexAssertion(found_at_most.concept, found_constant)
-        elif isinstance(found_at_most.concept, DLTop):
-            # TODO: ???
-            raise NotImplementedError("DLTop")
-        elif isinstance(found_at_most.concept, DLBottom):
-            # TODO: ???
-            raise NotImplementedError("DLBottom")
         else:
             print(type(found_at_most.concept))
             raise RuntimeError("should not happen")
@@ -819,14 +898,24 @@ def choose_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
 
         neg_assertion : Assertion = None
 
-        # TODO: push into...
+        # DONE: push into...
         if isinstance(new_assertion, ConceptAssertion) and isinstance(new_assertion.concept, PrimitiveConcept):
-            neg_assertion = ComplexAssertion(Not(new_assertion.concept), found_constant)
+            inside = push_in_not(expand_concept(new_assertion.concept))
+            if isinstance(inside, PrimitiveConcept):
+                neg_assertion = ConceptAssertion(inside, found_constant)
+            else:
+                neg_assertion = ComplexAssertion(inside, found_constant)
         elif isinstance(new_assertion, ComplexAssertion):
-            new_assertion = ComplexAssertion(push_in_not(Not(new_assertion.formula)), found_constant)
+            inside = push_in_not(expand_formula(new_assertion.formula))
+            if isinstance(inside, PrimitiveConcept):
+                neg_assertion = ConceptAssertion(inside, found_constant)
+            else:
+                neg_assertion = ComplexAssertion(inside, found_constant)
+        else:
+            raise RuntimeError("should not be here")
 
         pos_abox.add(new_assertion)
-        neg_abox.add(new_assertion)
+        neg_abox.add(neg_assertion)
 
 
 
@@ -855,14 +944,31 @@ def exist_certain_at_most_violation(abox: ABox, source: Assertion):
         if isinstance(assertion, RelationAssertion) and assertion.relation == source.formula.relation and assertion.obj1 == source.obj:
             all_b_list.append(assertion.obj2)
 
+    print("debug all_b_list1", all_b_list)
+
+
     # then filter by C
     filtered_all_b_list = []
     for b in all_b_list:
+
+        if is_this_top_something(source.formula.concept):
+            filtered_all_b_list.append(b)
+            continue
+
+
         b_query = build_cf_query(source.formula.concept, b)
         if b_query in abox:
             filtered_all_b_list.append(b)
 
     all_b_list = filtered_all_b_list
+
+    print("debug all_b_list", all_b_list)
+
+    # special case: AtMost 0 relation Top should always be violated
+    # even when there is no constant
+    if n == 0 and is_this_top_something(source.formula.concept):
+        return True
+
 
     # quick test
     if len(all_b_list) <= n:
@@ -892,6 +998,8 @@ def exist_at_most_violation(abox: ABox) -> bool:
         if isinstance(assertion, ComplexAssertion) and isinstance(assertion.formula, AtMost):
             all_at_most_list.append(assertion)
 
+    print("debug all_at_most_list", all_at_most_list)
+
     # check one by one
     for atmost in all_at_most_list:
         if exist_certain_at_most_violation(abox, atmost):
@@ -905,9 +1013,11 @@ def exist_at_most_violation(abox: ABox) -> bool:
 def is_abox_open(abox: ABox) -> bool:
     # TODO: add support for TOP/BOTTOM
     if exist_same_inequality(abox):
+        print("is_abox_open: exist same inequality")
         return False
 
     if exist_at_most_violation(abox):
+        print("is_abox_open: exist at most violation")
         return False
 
     # TODO: another contradiction
@@ -933,11 +1043,71 @@ def is_abox_open(abox: ABox) -> bool:
 
     return True
 
+def is_this_top_something(c: Union[DefinedConcept, ComplexAssertion, Formula, Concept]):
+    return c == Top \
+        or (c == Top.definition or c == push_in_not(Not(Bottom.definition))) \
+        or (isinstance(c, DefinedConcept) and (c.definition == Top.definition or c == push_in_not(Not(Bottom.definition)))) \
+        or (isinstance(c, ComplexAssertion) and (c.formula == Top.definition or c == push_in_not(Not(Bottom.definition)))) \
+        or (isinstance(c, Formula) and (c == Top.definition or c == push_in_not(Not(Bottom.definition))))
+
+
+def is_this_bottom_something(c: Union[DefinedConcept, ComplexAssertion, Formula, Concept]):
+    return c == Bottom \
+           or (c == Bottom.definition or c == push_in_not(Not(Top.definition))) \
+           or (isinstance(c, DefinedConcept) and (
+                c.definition == Bottom.definition or c == push_in_not(Not(Top.definition)))) \
+           or (isinstance(c, ComplexAssertion) and (
+                c.formula == Bottom.definition or c == push_in_not(Not(Top.definition)))) \
+           or (isinstance(c, Formula) and (c == Bottom.definition or c == push_in_not(Not(Top.definition))))
+
+
+def is_this_assertion_top(ca: ComplexAssertion) -> bool:
+    if not isinstance(ca, ComplexAssertion):
+        raise ValueError
+    obj: Constant = ca.obj
+    return is_this_top_something(ca.formula) or build_cf_query(Top.definition, obj) == ca
+
+def is_this_assertion_bottom(ca: ComplexAssertion) -> bool:
+    if not isinstance(ca, ComplexAssertion):
+        raise ValueError
+    obj: Constant = ca.obj
+    return is_this_bottom_something(ca.formula) or build_cf_query(Bottom.definition, obj) == ca
+
+def post_process_top_bottom(abox: ABox) -> Optional[ABox]:
+    # this clears abox containing bottom, so they can later be deleted
+    # and removes top from existing abox
+
+    new_abox = set()
+
+    for assertion in abox:
+        if isinstance(assertion, ComplexAssertion):
+            # print("checking:", assertion)
+            if is_this_assertion_bottom(assertion):
+                print("bottom found", assertion)
+                return None
+            elif is_this_assertion_top(assertion):
+                print("top found", assertion)
+                # don't add
+                continue
+            else:
+                # print("neither")
+                new_abox.add(assertion)
+        else:
+            new_abox.add(assertion)
+
+    return new_abox
 
 def run_tableau_algo(abox: ABox):
     # hash?
     # duplicate abox?
     worlds: List[ABox] = [abox]
+
+    print("---initial----")
+    print("Current Worlds: ", len(worlds))
+    for idx, w in enumerate(worlds):
+        print(idx, "len", len(w), "----")
+        for idx2, l in enumerate(w):
+            print("world", idx, "line", idx2, l)
 
     found_one_apply = False
 
@@ -949,7 +1119,7 @@ def run_tableau_algo(abox: ABox):
         current_idx = -1
         replace_new_list = None
 
-        rules = [and_rule, union_rule, forall_rule, partial(exist_rule, cs=cs), at_most_rule, choose_rule,partial(at_least_rule, cb=cb)]
+        rules = [and_rule, union_rule, forall_rule, choose_rule, partial(at_least_rule, cb=cb), at_most_rule, partial(exist_rule, cs=cs),]
 
         # rules = [and_rule, forall_rule ,partial(exist_rule, cs=cs)]
 
@@ -972,11 +1142,35 @@ def run_tableau_algo(abox: ABox):
             worlds.pop(current_idx)
             worlds += replace_new_list
 
+
+        # process top/bottom
+        post_processed_world_list = []
+        for world in worlds:
+            new_world: Optional[ABox] = post_process_top_bottom(world)
+            if new_world is not None:
+                post_processed_world_list.append(new_world)
+            else:
+                print("BOTTOM FOUND: world eliminated!")
+                print("eliminated world: ")
+                for idx, assertion in enumerate(world):
+                    print(idx, assertion)
+
+        worlds = post_processed_world_list
+
+        # post process 2: remove same world
+        # simulate a set of aboxes
+
+        print("--dedupe world--")
+        print("before dedupe len=", len(worlds))
+        frozen_worlds = {frozenset(world) for world in worlds}
+        worlds = [set(world) for world in frozen_worlds]
+        print("after dedupe len=", len(worlds))
+
         # print world
-        print("------------------")
+        print("-------intermediate-----------")
         print("Current Worlds: ", len(worlds))
         for idx, w in enumerate(worlds):
-            print(idx, "len", len(w), w)
+            print(idx, "len", len(w), "----")
             for idx2, l in enumerate(w):
                 print("world", idx, "line", idx2, l)
         print("------------------")
@@ -995,6 +1189,8 @@ def run_tableau_algo(abox: ABox):
     # remove with index?
 
     # check if has an open world
+    print("-------final-----------")
+
     print("Worlds: ", len(worlds))
     world_open_list: List[bool] = []
     for idx, w in enumerate(worlds):
@@ -1006,8 +1202,24 @@ def run_tableau_algo(abox: ABox):
         print(idx, "open?", world_open_bool)
         world_open_list.append(world_open_bool)
 
-    print("world overview: ", world_open_list)
+    print("world overview: ", len(world_open_list), world_open_list)
     print("final verdict: ", any(world_open_list))
+    print("note: consistency")
+
+    return any(world_open_list)
+
+
+def is_subsumption_of(c1: Concept, c2: Concept) -> bool:
+    anded = push_in_not(And(expand_concept(c1),Not(expand_concept(c2))))
+    a = Constant("$a")
+    abox = {(anded)(a)}
+
+    is_consistent = run_tableau_algo(process_abox(abox))
+    return not is_consistent
+
+
+
+
 
 
 if __name__ == '__main__':
@@ -1015,6 +1227,12 @@ if __name__ == '__main__':
     Studious = PrimitiveConcept("Studious")
     GoodStudent = DefinedConcept("GoodStudent", And(Smart, Studious))
     attendBy = Relation("attendBy")
+
+    c1 = DefinedConcept("c1", And(Exists(attendBy, Smart), Exists(attendBy, Studious)))
+    c2 = DefinedConcept("c2", Exists(attendBy, GoodStudent))
+    # should be false
+    # print("is subsumption?", is_subsumption_of(c1, c2))
+
 
     StraightA = PrimitiveConcept("StraightA")
     MultiOffer = PrimitiveConcept("MultiOffer")
@@ -1068,8 +1286,8 @@ if __name__ == '__main__':
     # print(abox)
     # print(process_abox(abox))
 
-    # processed_abox = process_abox(abox)
-    # run_tableau_algo(processed_abox)
+    # smart, studious, good student
+    # run_tableau_algo(process_abox(abox))
 
     A = PrimitiveConcept("A")
     B = PrimitiveConcept("B")
@@ -1082,25 +1300,28 @@ if __name__ == '__main__':
     p3 = ForAll(r, Exists(s, C))
     p4 = Exists(r, Exists(s, And(A, And(B, C))))
 
+    # assignment 2 q3.a / worksheet 3 q1 a
     w2 = And(p1, And(p2, And(p3, Not(p4))))
 
     # print(w2)
     abox = {w2(a)}
-    # pb = process_abox(abox)
-
+    pb = process_abox(abox)
     # run_tableau_algo(pb)
 
     # TOD0: test top/bottom
 
+    r = Relation("r")
+    s = Relation("s")
     p1 = ForAll(r, ForAll(s, A))
     p2 = Or(Exists(r, ForAll(s, Not(A))), ForAll(r, Exists(s, B)))
     p3 = Or(ForAll(r, Exists(s, And(A, B))), Exists(r, ForAll(s, Not(B))))
 
+    # assignment 2 q3 b / worksheet 3 q1 b
     w3 = And(p1, And(p2, Not(p3)))
 
     # print(w3)
-    # abox = {w3(a)}
-    # pb = process_abox(abox)
+    abox = {w3(a)}
+    pb = process_abox(abox)
     # run_tableau_algo(pb)
 
 
@@ -1130,12 +1351,314 @@ if __name__ == '__main__':
     # print(process_abox(abox))
     # print(run_tableau_algo(process_abox(abox)))
 
+    # tabluar 2000.pdf
+
     abox = {SmallFamilyParent(Franz), hasChild(Franz, Luisa), hasChild(Franz, Sophie),
             hasChild(Franz, Willy), hasChild(Franz, Julian),
             ne(Julian, Luisa), ne(Julian, Sophie), ne(Willy, Luisa), ne(Willy, Sophie)}
 
     # abox = {NotTest1(Franz), NotTest2(Franz), NotTest3(Franz)}
 
-    print(abox)
-    print(process_abox(abox))
-    print(run_tableau_algo(process_abox(abox)))
+    # print(abox)
+    # print(process_abox(abox))
+    # print(run_tableau_algo(process_abox(abox)))
+
+
+    A = PrimitiveConcept("A")
+    r = Relation("r")
+
+    a = Constant("a")
+    b = Constant("b")
+    c = Constant("c")
+    d = Constant("d")
+
+
+    # worksheet 3 q2
+    # world overview:  4 [False, False, False, False]
+    # final verdict:  False
+    w = Exists(r, Or(And(A,Exists(r, A)), Or(Not(A), Exists(r, Exists(r, Not(A))))))
+    abox = {r(a,b), r(b,d), r(d,c), r(a,c), r(c,d), A(d), Not(w)(a)}
+
+    # print(run_tableau_algo(process_abox(abox)))
+
+
+    # note p 127
+    child = Relation("child")
+    Female = PrimitiveConcept("Female")
+
+    p1 = AtLeast(3, child, Top)
+    p2 = AtMost(1, child, Female)
+    p3 = AtMost(1, child, Not(Female))
+
+    w = And(p1, And(p2, p3))
+    a = Constant("a")
+    abox = {w(a)}
+
+    # print(run_tableau_algo(process_abox(abox)))
+
+    # note p 128: priority 1
+    P = PrimitiveConcept("P")
+    r = Relation("r")
+    a = Constant("a")
+
+    abox = {P(a), AtMost(1,r,P)(a), Exists(r,P)(a), ForAll(r, Exists(r, P))(a), r(a,a)}
+    # print(run_tableau_algo(process_abox(abox)))
+
+
+    # assignment 2 q4
+    hasChild = Relation("HasChild")
+    ParentWithMax2Children = DefinedConcept("ParentWithMax2Children", AtMost(2, hasChild, Top))
+    joe = Constant("joe")
+    ann = Constant("ann")
+    eva = Constant("eva")
+    mary = Constant("mary")
+
+    abox = {hasChild(joe, ann), hasChild(joe, eva), hasChild(joe,mary),
+            ParentWithMax2Children(joe)}
+
+    # run_tableau_algo(process_abox(abox))
+
+
+    # some of my cases
+    hasChild = Relation("HasChild")
+    ParentWithChildrenAtLeast = DefinedConcept("ParentWithChildren", AtLeast(1, hasChild, Top))
+    ParentWithChildrenExists = DefinedConcept("ParentWithChildren", Exists(hasChild, Top))
+    joe = Constant("joe")
+    ann = Constant("ann")
+    eva = Constant("eva")
+    mary = Constant("mary")
+
+    abox = {hasChild(joe, ann), hasChild(joe, eva), hasChild(joe, mary),
+            Not(ParentWithChildrenAtLeast)(joe)}
+
+    # run_tableau_algo(process_abox(abox))
+
+    abox = {hasChild(joe, ann), hasChild(joe, eva), hasChild(joe, mary),
+            Not(ParentWithChildrenExists)(joe)}
+
+    # run_tableau_algo(process_abox(abox))
+
+    ParentWithNoChildAtMost = DefinedConcept("PN", AtMost(0, hasChild, Top))
+    ParentWithNoChildForall = DefinedConcept("PN2", ForAll(hasChild, Bottom))
+
+    abox = {hasChild(joe, ann), hasChild(joe, eva), hasChild(joe, mary),
+            ParentWithNoChildAtMost(joe)}
+    # run_tableau_algo(process_abox(abox))
+
+    abox = {hasChild(joe, ann), hasChild(joe, eva), hasChild(joe, mary),
+            ParentWithNoChildForall(joe)}
+    # run_tableau_algo(process_abox(abox))
+
+    hasChild = Relation("HasChild")
+    ParentWithMax5Children = DefinedConcept("ParentWithMax5Children", AtMost(5, hasChild, Top))
+    ParentWithMax4Children = DefinedConcept("ParentWithMax4Children", AtMost(4, hasChild, Top))
+    ParentWithMax3Children = DefinedConcept("ParentWithMax3Children", AtMost(3, hasChild, Top))
+    ParentWithMax2Children = DefinedConcept("ParentWithMax2Children", AtMost(2, hasChild, Top))
+    ParentWithMax1Children = DefinedConcept("ParentWithMax1Children", AtMost(1, hasChild, Top))
+    ParentWithMax0Children = DefinedConcept("ParentWithMax0Children", AtMost(0, hasChild, Top))
+
+    ParentWithMin0Children = DefinedConcept("ParentWithMin0Children", AtLeast(0, hasChild, Top))
+    ParentWithMin1Children = DefinedConcept("ParentWithMin0Children", AtLeast(1, hasChild, Top))
+    ParentWithMin2Children = DefinedConcept("ParentWithMin0Children", AtLeast(2, hasChild, Top))
+    ParentWithMin3Children = DefinedConcept("ParentWithMin0Children", AtLeast(3, hasChild, Top))
+    ParentWithMin4Children = DefinedConcept("ParentWithMin0Children", AtLeast(4, hasChild, Top))
+    ParentWithMin5Children = DefinedConcept("ParentWithMin0Children", AtLeast(5, hasChild, Top))
+
+    joe = Constant("joe")
+
+    ann = Constant("ann")
+    eva = Constant("eva")
+    mary = Constant("mary")
+    andy = Constant("andy")
+
+    abox_base = {hasChild(joe, ann), hasChild(joe, eva), hasChild(joe, mary), hasChild(joe, andy)}
+
+    # 1 world
+    # abox_base.add(ParentWithMax5Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world
+    # min 6, no ineq, need to generate 6 constant
+    # abox_base.add(Not(ParentWithMax5Children)(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world
+    # abox_base.add(ParentWithMax4Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    ## 6 worlds: c(4,3)
+    # abox_base.add(ParentWithMax3Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world
+    # max 3 -> min 4
+    # no eq, should generate 4 constant
+    # abox_base.add(Not(ParentWithMax3Children)(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+
+    # 7 worlds: c(4,2)/2 + c(4,3)
+    # abox_base.add(ParentWithMax2Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world
+    # max 2 -> min 3
+    # no ineq, generate 3
+    # abox_base.add(Not(ParentWithMax2Children)(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+
+    # 1 world: all combined
+    # abox_base.add(ParentWithMax1Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, direct false
+    # abox_base.add(ParentWithMax0Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # abox_base.add(ParentWithMin0Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # if there already child, then just check
+    # abox_base.add(ParentWithMin1Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # if there is no child, then build a child
+    # abox_base = set()
+    # abox_base.add(ParentWithMin1Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # here is 2, but no ineq exists, thus should build 2
+    # abox_base.add(ParentWithMin2Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # here one ineq exists, no need to build
+    # abox_base.add(ParentWithMin2Children(joe))
+    # abox_base.add(ne(andy, ann))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # no ineq, build 3
+    # abox_base.add(ParentWithMin3Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+
+    # 1 world, true
+    # only 1 eq, need to build 3
+    # abox_base.add(ParentWithMin3Children(joe))
+    # abox_base.add(ne(andy, ann))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world true
+    # no choose 3 exist, need to build
+    # abox_base.add(ParentWithMin3Children(joe))
+    # abox_base.add(ne(andy, ann))
+    # abox_base.add(ne(andy, eva))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # have one n=3 combination, no need to build 3
+    # abox_base.add(ParentWithMin3Children(joe))
+    # abox_base.add(ne(andy, ann))
+    # abox_base.add(ne(andy, eva))
+    # abox_base.add(ne(ann, eva))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # not min 3 = max 2
+    # find the first n=3 combination that all inequlity combination (C(3,2)=3) is not a subset of abox
+    # if there is overlap, but not fully in, is not a subset
+    # thus find the first subset [CS('mary'), CS('eva'), CS('ann')]
+    # and as eva!=ann, only 2 combine -> 2 world
+    # seems legit to me
+    # abox_base.add(Not(ParentWithMin3Children)(joe))
+    # abox_base.add(ne(andy, ann))
+    # abox_base.add(ne(andy, eva))
+    # abox_base.add(ne(ann, eva))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world
+    # no ineq, build 4 constant
+    # abox_base.add(ParentWithMin4Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+
+    # reduce to max 3 child
+    # should have 6 world: c(4,2)
+    # abox_base.add(Not(ParentWithMin4Children)(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world
+    # no ineq, build 5 constant
+    # abox_base.add(ParentWithMin5Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # 1 world, true
+    # reduce to min 4 child
+    # abox_base.add(Not(ParentWithMin5Children)(joe))
+    # run_tableau_algo(process_abox(abox_base))
+
+
+    # TODO: add a test with more than 1 assertion!
+    alice = Constant("alice")
+    bob = Constant("bob")
+    charile = Constant("charile")
+    zoe = Constant("zoe")
+
+    lovedBy = Relation("love")
+    hatedBy = Relation("hate")
+
+    BeLoved = DefinedConcept("BeLoved", AtLeast(1, lovedBy, Top))
+    BeHated = DefinedConcept("BeHated", AtLeast(1, hatedBy, Top))
+    LovedByAtMost2 = DefinedConcept("LovedByAtMost3", AtMost(2, lovedBy, Top))
+    LovedByAtMost3 = DefinedConcept("LovedByAtMost3", AtMost(3, lovedBy, Top))
+    HatedByAtLeast2 = DefinedConcept("HatedByAtLeast2", AtLeast(2, hatedBy, Top))
+    HatedByAtLeast3 = DefinedConcept("HatedByAtLeast2", AtLeast(3, hatedBy, Top))
+    AllLoved = DefinedConcept("AllLoved", ForAll(lovedBy, Top))
+    AllHated = DefinedConcept("AllHated", ForAll(hatedBy, Top))
+
+    LovedByAtLeast1 = DefinedConcept("ll1", AtLeast(1, lovedBy, Top))
+    LovedByExist = DefinedConcept("le", Exists(lovedBy, Top))
+
+    # Simple: 2nd argument is the larger
+    # print(is_subsumption_of(LovedByAtMost2, LovedByAtMost3)) # true
+    # print(is_subsumption_of(LovedByAtMost3, LovedByAtMost2)) # false
+    # print(is_subsumption_of(HatedByAtLeast2, HatedByAtLeast3)) # false
+    # print(is_subsumption_of(HatedByAtLeast3, HatedByAtLeast2)) # true
+
+    # print(is_subsumption_of(LovedByAtMost3, HatedByAtLeast2)) # false
+
+    # print(is_subsumption_of(LovedByAtLeast1, LovedByExist)) # true
+
+    # FIXME: wtf?
+    print(is_subsumption_of(LovedByExist, LovedByAtLeast1))
+
+
+    # FIXME: can this be compared???
+    # Don't know the number of all loved?
+    # should be false ????? -> true???
+    # print(is_subsumption_of(LovedByAtMost2, AllLoved))
+    # print(is_subsumption_of(AllLoved, LovedByAtMost2)) # overflow...
+
+    # should be true
+    # print(is_subsumption_of(HatedByAtLeast2, AllHated))
+
+    # should be false
+    # print(is_subsumption_of(AllHated, HatedByAtLeast2))
+
+    abox_base = {lovedBy(alice, bob), lovedBy(alice, charile), lovedBy(alice, zoe),
+                 hatedBy(zoe, bob), hatedBy(alice, zoe), hatedBy(zoe, charile), hatedBy(zoe, zoe)}
+
+    # abox_base.add((LovedByAtMost3)(alice))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # abox_base.add(Not(LovedByAtMost3)(alice))
+    # run_tableau_algo(process_abox(abox_base))
+
+    # abox_base.add(Not(HatedByAtLeast2)(zoe))
+    # run_tableau_algo(process_abox(abox_base))
+

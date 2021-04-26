@@ -145,7 +145,7 @@ class DefinedConcept(Concept, Formula):
         return f"DC({self.name}: {self.definition})"
 
     def __eq__(self, other):
-        return isinstance(other, DefinedConcept) and self.name == other.name and self.definition == other.definition
+        return isinstance(other, DefinedConcept) and  self.definition == other.definition
 
     def __hash__(self):
         return Concept.__hash__(self)
@@ -204,6 +204,8 @@ class ForAll(Operator):
     def __init__(self, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
         Operator.__init__(self, "ForAll")
         self.relation = relation
+        if not isinstance(self.relation, Relation):
+            raise ValueError
         self.concept = concept
 
     def __repr__(self):
