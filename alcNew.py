@@ -283,10 +283,10 @@ def exist_already_exist(abox: ABox, r: Relation, c: Concept, a: Constant) -> boo
     # then check C(c)
 
     # special case: For top directly return
-    print("debug exist rule, C", c)
-    if is_this_top_something(c):
-        print("debug exist rule, found top")
-        return True
+    # print("debug exist rule, C", c)
+    # if is_this_top_something(c):
+    #     print("debug exist rule, found top")
+    #     return True
 
     possible_query = {build_cf_query(c, p) for p in possible_2nd_set}
     for assertion in abox:
@@ -352,8 +352,8 @@ def exist_rule(abox: ABox, cs: ConstantStorage) -> Tuple[bool, List[ABox]]:
 
 
 def union_neither_exists(abox: ABox, C: Union[Concept, Formula], D: Union[Concept, Formula], a: Constant) -> bool:
-    if is_this_top_something(C):
-        return not True and not True
+    # if is_this_top_something(C):
+    #     return not True and not True
 
     c_a_exist, d_a_exist = False, False
     c_query, d_query = build_cf_query(C, a), build_cf_query(D, a)
@@ -527,9 +527,11 @@ def at_least_should_apply(abox: ABox, n: int, r: Relation, c: Union[Concept, For
         # special case
         # print(c)
         if is_this_top_something(c):
+            pass
             # print("debug been here")
             # TODO: always success
             new_all_c_li.append(current_ci)
+
         elif isinstance(c, DLBottom):
             # TODO: always fail
             pass
@@ -801,8 +803,8 @@ def at_most_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
 
 def choose_rule_can_apply(abox: ABox, r: Relation, c: Concept, a: Constant) -> Tuple[bool, Optional[Constant]]:
     # don't apply if C is top
-    if is_this_top_something(c):
-        return False, None
+    # if is_this_top_something(c):
+    #     return False, None
 
     print("debug choose rule: c", c)
     print("debug choose rule equal:", c==Top)
@@ -965,9 +967,11 @@ def exist_certain_at_most_violation(abox: ABox, source: Assertion):
     print("debug all_b_list", all_b_list)
 
     # special case: AtMost 0 relation Top should always be violated
+    # note: atmost 0 top
     # even when there is no constant
-    if n == 0 and is_this_top_something(source.formula.concept):
-        return True
+    # FIXME: should only n==0 (if not found)
+    # if n == 0 and is_this_top_something(source.formula.concept):
+    #     return True
 
 
     # quick test
@@ -1073,7 +1077,28 @@ def is_this_assertion_bottom(ca: ComplexAssertion) -> bool:
     obj: Constant = ca.obj
     return is_this_bottom_something(ca.formula) or build_cf_query(Bottom.definition, obj) == ca
 
-def post_process_top_bottom(abox: ABox) -> Optional[ABox]:
+
+def pre_process_top(abox: ABox):
+    # directly edit in place
+    new_tops : Set[Assertion] = set()
+    for assertion in abox:
+        if isinstance(assertion, ConceptAssertion):
+            new_tops.add(Top(assertion.obj))
+        elif isinstance(assertion, RelationAssertion):
+            new_tops.add(Top(assertion.obj1))
+            new_tops.add(Top(assertion.obj2))
+        elif isinstance(assertion, ComplexAssertion):
+            new_tops.add(Top(assertion.obj))
+        elif isinstance(assertion, InequalityAssertion):
+            new_tops.add(Top(assertion.obj1))
+            new_tops.add(Top(assertion.obj2))
+
+    new_tops = process_abox(new_tops)
+    # just an add all
+    abox.update(new_tops)
+
+
+def post_process_bottom(abox: ABox) -> Optional[ABox]:
     # this clears abox containing bottom, so they can later be deleted
     # and removes top from existing abox
 
@@ -1086,9 +1111,11 @@ def post_process_top_bottom(abox: ABox) -> Optional[ABox]:
                 print("bottom found", assertion)
                 return None
             elif is_this_assertion_top(assertion):
-                print("top found", assertion)
+                # in fact need to add all top, don't remove...
+                pass
+                # print("top found", assertion)
                 # don't add
-                continue
+                # continue
             else:
                 # print("neither")
                 new_abox.add(assertion)
@@ -1115,6 +1142,10 @@ def run_tableau_algo(abox: ABox):
     cb = ConstantBuilder()
 
     while True:
+
+        # pre process
+        for world in worlds:
+            pre_process_top(world)
 
         current_idx = -1
         replace_new_list = None
@@ -1146,7 +1177,7 @@ def run_tableau_algo(abox: ABox):
         # process top/bottom
         post_processed_world_list = []
         for world in worlds:
-            new_world: Optional[ABox] = post_process_top_bottom(world)
+            new_world: Optional[ABox] = post_process_bottom(world)
             if new_world is not None:
                 post_processed_world_list.append(new_world)
             else:
@@ -1620,6 +1651,8 @@ if __name__ == '__main__':
     HatedByAtLeast3 = DefinedConcept("HatedByAtLeast2", AtLeast(3, hatedBy, Top))
     AllLoved = DefinedConcept("AllLoved", ForAll(lovedBy, Top))
     AllHated = DefinedConcept("AllHated", ForAll(hatedBy, Top))
+
+
 
     LovedByAtLeast1 = DefinedConcept("ll1", AtLeast(1, lovedBy, Top))
     LovedByExist = DefinedConcept("le", Exists(lovedBy, Top))

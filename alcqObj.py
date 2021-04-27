@@ -369,5 +369,5 @@ def ne(obj1: Constant, obj2: Constant) -> InequalityAssertion:
 
 InternalA = PrimitiveConcept("$InternalA")
 Top = DefinedConcept("Top", Or(InternalA, Not(InternalA)))
-InternalB = PrimitiveConcept("$InternalB")
-Bottom = DefinedConcept("Bottom", And(InternalB, Not(InternalB)))
+# InternalB = PrimitiveConcept("$InternalB")
+Bottom = DefinedConcept("Bottom", And(InternalA, Not(InternalA)))
