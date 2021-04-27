@@ -9,36 +9,6 @@
 from typing import Union, Set, List
 
 
-# Description Logic Constant
-class DLConstant(object):
-    def __init__(self, name: str):
-        self.name = name
-
-    def __repr__(self):
-        return f"DConstant({self.name!r})"
-
-    def __eq__(self, other):
-        return isinstance(other, DLConstant) and self.name == other.name
-
-    def __hash__(self):
-        return hash(self.__repr__())
-
-
-class DLTop(DLConstant):
-    def __init__(self):
-        DLConstant.__init__(self, "Top")
-
-    def __repr__(self):
-        return "⊤"
-
-
-class DLBottom(DLConstant):
-    def __init__(self):
-        DLConstant.__init__(self, "Bottom")
-
-    def __repr__(self):
-        return "⊥"
-
 
 # Top = DLTop()
 # Bottom = DLBottom()
@@ -201,7 +171,7 @@ class Not(Operator):
 
 
 class ForAll(Operator):
-    def __init__(self, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
+    def __init__(self, relation: Relation, concept: Union[Concept, Formula]):
         Operator.__init__(self, "ForAll")
         self.relation = relation
         if not isinstance(self.relation, Relation):
@@ -219,7 +189,7 @@ class ForAll(Operator):
 
 
 class Exists(Operator):
-    def __init__(self, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
+    def __init__(self, relation: Relation, concept: Union[Concept, Formula]):
         Operator.__init__(self, "Exists")
         self.relation = relation
         self.concept = concept
@@ -235,7 +205,7 @@ class Exists(Operator):
 
 
 class AtLeast(Operator):
-    def __init__(self, n: int, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
+    def __init__(self, n: int, relation: Relation, concept: Union[Concept, Formula]):
         Operator.__init__(self, "AtLeast")
         if n < 0:
             raise ValueError("invalid n")
@@ -255,7 +225,7 @@ class AtLeast(Operator):
         return hash(self.__repr__())
 
 class AtMost(Operator):
-    def __init__(self, n: int, relation: Relation, concept: Union[DLConstant, Concept, Formula]):
+    def __init__(self, n: int, relation: Relation, concept: Union[Concept, Formula]):
         Operator.__init__(self, "AtMost")
         if n < 0:
             raise ValueError("invalid n")
@@ -317,7 +287,6 @@ class RelationAssertion(Assertion):
         return Assertion.__hash__(self)
 
 
-# TODO: make this a set?
 ABox = Set[Assertion]
 TBox = List[Concept]
 
