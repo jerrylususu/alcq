@@ -1,8 +1,13 @@
 from alcqObj import *
-from alcNew import *
+from alcq import *
 
 
 def good_student():
+    """
+    smart, studious, good student
+    adapted from slides "05-description-logic", page 23~27
+    :return:
+    """
     Smart = PrimitiveConcept("Smart")
     Studious = PrimitiveConcept("Studious")
     GoodStudent = DefinedConcept("GoodStudent", And(Smart, Studious))
@@ -15,6 +20,11 @@ def good_student():
     # should be false
 
 def hw2q3a_ws3q1a():
+    """
+    homework 2, question 3a
+    worksheet 3, question 1a
+    :return:
+    """
     A = PrimitiveConcept("A")
     B = PrimitiveConcept("B")
     C = PrimitiveConcept("C")
@@ -34,6 +44,11 @@ def hw2q3a_ws3q1a():
 
 
 def hw2q3b_ws3q1b():
+    """
+    homework 2, question 3b
+    worksheet 3, question 1b
+    :return:
+    """
     A = PrimitiveConcept("A")
     B = PrimitiveConcept("B")
     C = PrimitiveConcept("C")
@@ -51,6 +66,10 @@ def hw2q3b_ws3q1b():
 
 
 def ws3q2():
+    """
+    worksheet 3, question 2
+    :return:
+    """
     A = PrimitiveConcept("A")
     r = Relation("r")
 
@@ -65,6 +84,10 @@ def ws3q2():
     # consistency false -> A is an instance
 
 def notep128_priority1():
+    """
+    involves priority between rules
+    :return:
+    """
     P = PrimitiveConcept("P")
     r = Relation("r")
     a = Constant("a")
@@ -76,6 +99,10 @@ def notep128_priority1():
 
 
 def notep127():
+    """
+    a obvious inconsistent abox
+    :return:
+    """
     child = Relation("child")
     Female = PrimitiveConcept("Female")
 
@@ -92,6 +119,10 @@ def notep127():
 
 
 def hw2q4():
+    """
+    homework 2, question 4
+    :return:
+    """
     hasChild = Relation("HasChild")
     ParentWithMax2Children = DefinedConcept("ParentWithMax2Children", AtMost(2, hasChild, Top))
     joe = Constant("joe")
@@ -111,6 +142,10 @@ def hw2q4():
 
 
 def parent_child_extensive():
+    """
+    an extensive check for number restrictions
+    :return:
+    """
     # need to uncomment the part you want to test before running
 
     hasChild = Relation("HasChild")
@@ -267,6 +302,11 @@ def parent_child_extensive():
 
 
 def love_hate():
+    """
+    mainly for checking subsumptions
+    :return:
+    """
+
     alice = Constant("alice")
     bob = Constant("bob")
     charile = Constant("charile")
@@ -289,7 +329,7 @@ def love_hate():
 
     # Simple: 2nd argument is the larger
     # C ⊑T D
-    # print("is subsumption?", is_subsumption_of(LovedByAtMost2, LovedByAtMost3)) # true
+    print("is subsumption?", is_subsumption_of(LovedByAtMost2, LovedByAtMost3)) # true
     # print("is subsumption?", is_subsumption_of(LovedByAtMost3, LovedByAtMost2)) # false
     # print("is subsumption?", is_subsumption_of(HatedByAtLeast2, HatedByAtLeast3)) # false
     # print("is subsumption?", is_subsumption_of(HatedByAtLeast3, HatedByAtLeast2)) # true
@@ -325,11 +365,9 @@ def main():
     # ws3q2()
     # notep128_priority1()
     # notep127()
-    # hw2q4()
-    parent_child_extensive()
+    hw2q4()
+    # parent_child_extensive()
     # love_hate()
 
 if __name__ == '__main__':
-
-
     main()
