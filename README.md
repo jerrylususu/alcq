@@ -5,6 +5,10 @@ Language: Python
 Environment Requirement: Python 3.8+
 
 
+## Known Design Issues!
+* ComplexAssertion & DefinedConcept
+
+
 ## File Structure
 
 * `alcqObj.py`: All the classes for Description Logic of ALCQ, including `Constant`, `Concept`, `Assertions`, `ABox`, `TBox` and more.
@@ -101,6 +105,8 @@ Note that as the program outputs verbose results by default, it is recommended t
 
 
 ## Interpreting Output
+
+> By default, `verbose` is set to `False`. To get the full output, set `verbose` to `True` when invoking `run_tableau_algo`.
 
 ### Results
 
