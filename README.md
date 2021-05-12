@@ -1,14 +1,9 @@
 # Assignment 2: ALCQ
 
-Zhirui Lu
-
-
-
 Language: Python
 
 Environment Requirement: Python 3.8+
 
-> Note: Open the PDF/Markdown file in a reader that supports bookmark/outlining for easier navigation.
 
 ## File Structure
 
@@ -70,6 +65,7 @@ Note that as the program outputs verbose results by default, it is recommended t
 
    ```python
    a = Constant("a")
+   b = Constant("b")
    s1 = Constant("Student 1")
    c1 = Constant("Course 1")
    
@@ -77,6 +73,9 @@ Note that as the program outputs verbose results by default, it is recommended t
    attend_by_assertion = attendBy(c1, s1)
    
    complex_assertion = And(Exists(attendBy, Smart), And(Exists(attendBy, Studious), Not(Exists(attendBy, GoodStudent))))(a)
+   
+   not_equal_assertion = InequalityAssertion(a,b)
+   not_equal_assertion_simple = ne(a,b)
    ```
 
 3. For consistency check, wrap all the assertions in a `set` (representing abox) and run the tableau algorithm.
