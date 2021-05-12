@@ -388,10 +388,16 @@ def union_rule(abox: ABox) -> Tuple[bool, List[ABox]]:
         new_abox = set(abox)
 
         abox_c = set(new_abox)
-        abox_c.add(ComplexAssertion(found_or.param1, found_assertion.obj))
+        if isinstance(found_or.param1, PrimitiveConcept):
+            abox_c.add(ConceptAssertion(found_or.param1, found_assertion.obj))
+        else:
+            abox_c.add(ComplexAssertion(found_or.param1, found_assertion.obj))
 
         abox_d = set(new_abox)
-        abox_d.add(ComplexAssertion(found_or.param2, found_assertion.obj))
+        if isinstance(found_or.param2, PrimitiveConcept):
+            abox_d.add(ConceptAssertion(found_or.param2, found_assertion.obj))
+        else:
+            abox_d.add(ComplexAssertion(found_or.param2, found_assertion.obj))
 
         return True, [abox_c, abox_d]
     else:
@@ -1072,17 +1078,18 @@ def post_process_bottom(abox: ABox) -> Optional[ABox]:
 
     return new_abox
 
-def run_tableau_algo(abox: ABox):
+def run_tableau_algo(abox: ABox, verbose=False):
     # hash?
     # duplicate abox?
     worlds: List[ABox] = [abox]
 
-    print("---initial----")
-    print("Current Worlds: ", len(worlds))
-    for idx, w in enumerate(worlds):
-        print(idx, "len", len(w), "----")
-        for idx2, l in enumerate(w):
-            print("world", idx, "line", idx2, l)
+    if verbose:
+        print("---initial----")
+        print("Current Worlds: ", len(worlds))
+        for idx, w in enumerate(worlds):
+            print(idx, "len", len(w), "----")
+            for idx2, l in enumerate(w):
+                print("world", idx, "line", idx2, l)
 
     found_one_apply = False
 
@@ -1129,30 +1136,32 @@ def run_tableau_algo(abox: ABox):
             if new_world is not None:
                 post_processed_world_list.append(new_world)
             else:
-                print("BOTTOM FOUND: world eliminated!")
-                print("eliminated world: ")
-                for idx, assertion in enumerate(world):
-                    print(idx, assertion)
+                if verbose:
+                    print("BOTTOM FOUND: world eliminated!")
+                    print("eliminated world: ")
+                    for idx, assertion in enumerate(world):
+                        print(idx, assertion)
 
         worlds = post_processed_world_list
 
         # post process 2: remove same world
         # simulate a set of aboxes
 
-        print("--dedupe world--")
-        print("before dedupe len=", len(worlds))
-        frozen_worlds = {frozenset(world) for world in worlds}
-        worlds = [set(world) for world in frozen_worlds]
-        print("after dedupe len=", len(worlds))
+        if verbose:
+            print("--dedupe world--")
+            print("before dedupe len=", len(worlds))
+            frozen_worlds = {frozenset(world) for world in worlds}
+            worlds = [set(world) for world in frozen_worlds]
+            print("after dedupe len=", len(worlds))
 
-        # print world
-        print("-------intermediate-----------")
-        print("Current Worlds: ", len(worlds))
-        for idx, w in enumerate(worlds):
-            print(idx, "len", len(w), "----")
-            for idx2, l in enumerate(w):
-                print("world", idx, "line", idx2, l)
-        print("------------------")
+            # print world
+            print("-------intermediate-----------")
+            print("Current Worlds: ", len(worlds))
+            for idx, w in enumerate(worlds):
+                print(idx, "len", len(w), "----")
+                for idx2, l in enumerate(w):
+                    print("world", idx, "line", idx2, l)
+            print("------------------")
 
         # jump out if no more rules can be applied
         if not found_one_apply:
@@ -1173,9 +1182,10 @@ def run_tableau_algo(abox: ABox):
     print("Worlds: ", len(worlds))
     world_open_list: List[bool] = []
     for idx, w in enumerate(worlds):
-        print(idx, w)
-        for idx2, l in enumerate(w):
-            print("world", idx, "line", idx2, l)
+        if verbose:
+            print(idx, w)
+            for idx2, l in enumerate(w):
+                print("world", idx, "line", idx2, l)
 
         world_open_bool: bool = is_abox_open(w)
         print(idx, "open?", world_open_bool)

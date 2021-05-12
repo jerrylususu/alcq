@@ -118,6 +118,33 @@ def notep127():
     # consistency should be false
 
 
+def final_q5_a():
+    # has a bug!!!!
+    # TODO: fix me!
+    R = Relation("R")
+    A = PrimitiveConcept("A")
+    B = PrimitiveConcept("B")
+
+    a = Constant("a")
+
+    w = Not(Or(ForAll(R, A), Exists(R, And(Not(A), Not(B)))))
+    abox = {w(a)}
+
+    print(run_tableau_algo(process_abox(abox)))
+
+
+def final_q5_b():
+    R = Relation("R")
+    S = Relation("S")
+    C = PrimitiveConcept("C")
+
+    a = Constant("a")
+
+    w = And(Exists(R, ForAll(S,C)), ForAll(R, Exists(S, Not(C))))
+    abox = {w(a)}
+
+    print(run_tableau_algo(process_abox(abox)))
+
 def hw2q4():
     """
     homework 2, question 4
@@ -232,8 +259,8 @@ def parent_child_extensive():
 
     # 1 world, true
     # here is 2, but no ineq exists, thus should build 2
-    abox_base.add(ParentWithMin2Children(joe))
-    run_tableau_algo(process_abox(abox_base))
+    # abox_base.add(ParentWithMin2Children(joe))
+    # run_tableau_algo(process_abox(abox_base))
 
     # 1 world, true
     # here one ineq exists, no need to build
@@ -274,11 +301,11 @@ def parent_child_extensive():
     # not the subset [andy, ann, eva} that has full ineq
     # and as eva!=ann, only 2 combine -> 2 world
     # seems legit to me
-    # abox_base.add(Not(ParentWithMin3Children)(joe))
-    # abox_base.add(ne(andy, ann))
-    # abox_base.add(ne(andy, eva))
-    # abox_base.add(ne(ann, eva))
-    # run_tableau_algo(process_abox(abox_base))
+    abox_base.add(Not(ParentWithMin3Children)(joe))
+    abox_base.add(ne(andy, ann))
+    abox_base.add(ne(andy, eva))
+    abox_base.add(ne(ann, eva))
+    run_tableau_algo(process_abox(abox_base))
 
     # 1 world
     # no ineq, build 4 constant
@@ -329,7 +356,7 @@ def love_hate():
 
     # Simple: 2nd argument is the larger
     # C ⊑T D
-    print("is subsumption?", is_subsumption_of(LovedByAtMost2, LovedByAtMost3)) # true
+    # print("is subsumption?", is_subsumption_of(LovedByAtMost2, LovedByAtMost3)) # true
     # print("is subsumption?", is_subsumption_of(LovedByAtMost3, LovedByAtMost2)) # false
     # print("is subsumption?", is_subsumption_of(HatedByAtLeast2, HatedByAtLeast3)) # false
     # print("is subsumption?", is_subsumption_of(HatedByAtLeast3, HatedByAtLeast2)) # true
@@ -350,6 +377,19 @@ def love_hate():
     # abox_base.add(Not(HatedByAtLeast2)(zoe))
     # run_tableau_algo(process_abox(abox_base))
 
+def lecture_0504_friend():
+    friend = Relation("Friend")
+    Nice = PrimitiveConcept("Nice")
+    Cool = PrimitiveConcept("Cool")
+    c1 = DefinedConcept("c1", Or(And(Nice, Not(Cool)), And(Not(Nice), Cool)))
+
+    a = Constant("a")
+
+    abox = {AtLeast(3, friend, Top)(a), AtMost(3, friend, Top)(a), Exists(friend, Nice)(a), ForAll(friend, c1)(a)}
+
+    run_tableau_algo(process_abox(abox))
+
+
 def main():
     """
     all test cases
@@ -365,9 +405,15 @@ def main():
     # ws3q2()
     # notep128_priority1()
     # notep127()
-    hw2q4()
+    # hw2q4()
     # parent_child_extensive()
     # love_hate()
+    # lecture_0504_friend()
+
+    final_q5_a()
+
+
+
 
 if __name__ == '__main__':
     main()
